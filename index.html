@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GL Fundos - Galeria de Assets</title>
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖼️</text></svg>">
+    
+    <style>
+        :root {
+            --primary: #C87F8B; /* Rose */
+            --secondary: #BCDFB9; /* Verde claro */
+            --bg-color: #fdfdfd;
+            --text-color: #2c3e50;
+            --border-radius: 12px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 2rem 1rem;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            letter-spacing: -0.5px;
+            font-weight: 700;
+        }
+
+        header p {
+            margin-top: 0.5rem;
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+
+        /* Navegação de Categorias */
+        #categories {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 2rem;
+            justify-content: center;
+        }
+
+        .category-btn {
+            background-color: #eee;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-color);
+            transition: all 0.3s ease;
+            text-transform: capitalize;
+        }
+
+        .category-btn:hover {
+            background-color: var(--secondary);
+        }
+
+        .category-btn.active {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        /* Grid de Imagens */
+        #gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .image-card {
+            position: relative;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            background: white;
+            transition: transform 0.3s ease;
+            aspect-ratio: 16 / 9;
+            cursor: pointer;
+        }
+
+        .image-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .image-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(200, 127, 139, 0.85); /* var(--primary) com transparência */
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .image-card:hover .overlay {
+            opacity: 1;
+        }
+
+        .overlay button {
+            background-color: white;
+            color: var(--primary);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: background 0.2s;
+        }
+
+        .overlay button:hover {
+            background-color: var(--secondary);
+            color: var(--text-color);
+        }
+
+        /* Loader e Status */
+        #status-message {
+            text-align: center;
+            font-size: 1.2rem;
+            color: #666;
+            margin: 2rem 0;
+        }
+
+        /* Notificação Toast */
+        #toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 8px;
+            padding: 16px;
+            position: fixed;
+            z-index: 1000;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            font-size: 1rem;
+            opacity: 0;
+            transition: opacity 0.3s, bottom 0.3s;
+        }
+
+        #toast.show {
+            visibility: visible;
+            opacity: 1;
+            bottom: 50px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>GL Fundos</h1>
+        <p>Repositório de assets visuais para aplicações e design instrucional</p>
+    </header>
+
+    <div class="container">
+        <div id="categories"></div>
+        <div id="status-message">Carregando pastas do GitHub...</div>
+        <div id="gallery"></div>
+    </div>
+
+    <div id="toast">Instrução copiada para a área de transferência!</div>
+
+    <script>
+        const REPO_OWNER = 'GlauberLASantiago';
+        const REPO_NAME = 'fundos';
+        const API_BASE_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents`;
+
+        const categoriesContainer = document.getElementById('categories');
+        const galleryContainer = document.getElementById('gallery');
+        const statusMessage = document.getElementById('status-message');
+        const toast = document.getElementById('toast');
+
+        // Formatos de imagem suportados
+        const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+
+        async function init() {
+            try {
+                const response = await fetch(API_BASE_URL);
+                if (!response.ok) {
+                    throw new Error('Repositório não encontrado ou vazio. Verifique se ele é Público.');
+                }
+                
+                const data = await response.json();
+                
+                // Filtra apenas diretórios (pastas)
+                const folders = data.filter(item => item.type === 'dir');
+
+                if (folders.length === 0) {
+                    statusMessage.innerHTML = "Nenhuma pasta encontrada no repositório. <br>Crie pastas (ex: 'musica', 'educacao') e adicione imagens.";
+                    return;
+                }
+
+                statusMessage.style.display = 'none';
+                
+                // Cria os botões de categoria
+                folders.forEach((folder, index) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'category-btn';
+                    btn.textContent = folder.name;
+                    btn.onclick = () => loadImages(folder.name, btn);
+                    categoriesContainer.appendChild(btn);
+
+                    // Carrega a primeira pasta por padrão
+                    if (index === 0) {
+                        loadImages(folder.name, btn);
+                    }
+                });
+
+            } catch (error) {
+                statusMessage.textContent = `Erro: ${error.message}`;
+            }
+        }
+
+        async function loadImages(folderName, activeBtn) {
+            // Atualiza botões visuais
+            document.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('active'));
+            activeBtn.classList.add('active');
+
+            galleryContainer.innerHTML = '';
+            statusMessage.style.display = 'block';
+            statusMessage.textContent = `Carregando imagens de '${folderName}'...`;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/${folderName}`);
+                const data = await response.json();
+
+                // Filtra apenas arquivos que são imagens
+                const images = data.filter(item => {
+                    if (item.type !== 'file') return false;
+                    const ext = item.name.substring(item.name.lastIndexOf('.')).toLowerCase();
+                    return validExtensions.includes(ext);
+                });
+
+                statusMessage.style.display = 'none';
+
+                if (images.length === 0) {
+                    galleryContainer.innerHTML = `<p style="grid-column: 1/-1; text-align:center;">Nenhuma imagem encontrada nesta pasta.</p>`;
+                    return;
+                }
+
+                images.forEach(img => {
+                    createImageCard(img.download_url, img.name);
+                });
+
+            } catch (error) {
+                statusMessage.style.display = 'block';
+                statusMessage.textContent = "Erro ao carregar imagens desta pasta.";
+            }
+        }
+
+        function createImageCard(url, filename) {
+            const card = document.createElement('div');
+            card.className = 'image-card';
+
+            const img = document.createElement('img');
+            img.src = url;
+            img.alt = filename;
+            img.loading = 'lazy'; // Melhora o desempenho carregando apenas o que aparece na tela
+
+            const overlay = document.createElement('div');
+            overlay.className = 'overlay';
+            
+            const title = document.createElement('h3');
+            title.textContent = filename;
+            title.style.margin = '0 0 10px 0';
+            title.style.fontSize = '1.1rem';
+
+            const btn = document.createElement('button');
+            btn.textContent = 'Copiar Código IA';
+            
+            // Ação de copiar ao clicar no botão ou no card
+            const copyAction = () => {
+                const promptText = `Por favor, utilize a seguinte imagem como fundo (background) da interface: ${url}`;
+                navigator.clipboard.writeText(promptText).then(() => {
+                    showToast();
+                });
+            };
+
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                copyAction();
+            };
+            card.onclick = copyAction;
+
+            overlay.appendChild(title);
+            overlay.appendChild(btn);
+            
+            card.appendChild(img);
+            card.appendChild(overlay);
+            
+            galleryContainer.appendChild(card);
+        }
+
+        function showToast() {
+            toast.className = "show";
+            setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 3000);
+        }
+
+        // Inicializa o app
+        init();
+    </script>
+</body>
+</html>
